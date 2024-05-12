@@ -14,4 +14,4 @@ FOUNDATION_EXPORT double TiWebauthnVersionNumber;
 //! Project version string for TiWebauthn.
 FOUNDATION_EXPORT const unsigned char TiWebauthnVersionString[];
 
-#import "TiWebauthnModuleAssets.h"
+#import <TiWebauthn/TiWebauthnModuleAssets.h>
