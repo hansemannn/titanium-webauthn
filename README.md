@@ -2,7 +2,7 @@
 
 Native support for the WebAuthn authentication strategy (also called "Passkeys") in Titanium!
 
-<img src="./.github/webauthn-logo.png" height="80" alt="WebAuthn Logo" />
+<img src="./.github/webauthn-logo.png" height="80" alt="WebAuthn Logo" /> <img src="./.github/passkeys-logo.png" height="80" alt="Passkeys Logo" />
 
 ## Requirements
 
