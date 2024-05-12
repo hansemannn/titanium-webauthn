@@ -64,9 +64,33 @@ extension TiWebauthnModule: ASAuthorizationControllerDelegate {
   func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
     if #available(iOS 15.0, *) {
       if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration {
-        fireEvent("registration", with: ["credential": String(data: credential.credentialID, encoding: .utf8)])
+        var event: [String: Any] = [
+          "type": "registration",
+          "rawClientDataJSON": credential.rawClientDataJSON.jsonRepresentation ?? "",
+          "credential": credential.credentialID.base64EncodedString(),
+          "rawAttestationObject": credential.rawAttestationObject?.base64EncodedString() ?? "",
+        ]
+        
+        if #available(iOS 17.0, *) {
+          event["authenticatorAttachment"] = credential.attachment.rawValue
+        }
+        
+        fireEvent("verification", with: event)
       } else if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion {
-        fireEvent("verification", with: ["credential": String(data: credential.credentialID, encoding: .utf8)])
+        var event: [String: Any] = [
+          "type": "assertion",
+          "rawClientDataJSON": credential.rawClientDataJSON.jsonRepresentation ?? "",
+          "credential": credential.credentialID.base64EncodedString(),
+          "authenticatorData": credential.rawAuthenticatorData.base64EncodedString(),
+          "userID": credential.userID.base64EncodedString(),
+          "signature": credential.signature.base64EncodedString()
+        ]
+        
+        if #available(iOS 17.0, *) {
+          event["authenticatorAttachment"] = credential.attachment.rawValue
+        }
+        
+        fireEvent("verification", with: event)
       } else {
         fireEvent("error", with: ["error": "Unhandled authentication case"])
       }
@@ -76,4 +100,17 @@ extension TiWebauthnModule: ASAuthorizationControllerDelegate {
   func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: any Error) {
     fireEvent("error", with: ["error": error.localizedDescription])
   }
+}
+
+extension Data {
+    var jsonRepresentation: NSString? {
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: self, options: []),
+              let data = try? JSONSerialization.data(withJSONObject: jsonObject,
+                                                     options: [.fragmentsAllowed]),
+              let json = NSString(data: data, encoding: String.Encoding.utf8.rawValue) else {
+                return nil
+             }
+
+        return json
+    }
 }
