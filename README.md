@@ -2,6 +2,8 @@
 
 Native support for the WebAuthn authentication strategy (also called "Passkeys") in Titanium!
 
+<img src="./.github/webauthn-logo.png" height="80" alt="WebAuthn Logo" />
+
 ## Requirements
 
 - [x] iOS 15+ (Android is not implemented, yet)
