@@ -6,14 +6,12 @@
 //  Copyright (c) 2024-present Hans Knöchel. All rights reserved.
 //
 
+import AuthenticationServices
 import TitaniumKit
-import WebAuthn
 
 @objc(TiWebauthnModule)
 class TiWebauthnModule: TiModule {
-  
-  private var webauthnManager: WebAuthnManager!
-  
+    
   func moduleGUID() -> String {
     return "db8ef0e6-e9e9-4795-9cf5-fea1dec9c463"
   }
@@ -21,63 +19,61 @@ class TiWebauthnModule: TiModule {
   override func moduleId() -> String! {
     return "ti.webauthn"
   }
-
-  @objc(initialize:)
-  func initialize(arguments: [Any]) {
+  
+  @available(iOS 15.0, *)
+  @objc(login:)
+  func login(arguments: [Any]) {
     guard let params = arguments.first as? [String: Any] else { fatalError("Missing parameters") }
+
+    guard let challengeString = params["challenge"] as? String else { fatalError("Missing parametwer \"challenge\"")}
+    guard let relyingParty = params["relyingParty"] as? String else { fatalError("Missing parametwer \"relyingParty\"")}
+
+    let challenge = challengeString.data(using: .utf8)!
+    let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: relyingParty)
+    let platformKeyRequest = platformProvider.createCredentialAssertionRequest(challenge: challenge)
+    let authController = ASAuthorizationController(authorizationRequests: [platformKeyRequest])
     
-    guard let relyingPartyID = params["relyingPartyID"] as? String else { fatalError("Missing parameter relyingPartyID") }
-    guard let relyingPartyName = params["relyingPartyName"] as? String else { fatalError("Missing parameter relyingPartyName") }
-    guard let relyingPartyOrigin = params["relyingPartyOrigin"] as? String else { fatalError("Missing parameter relyingPartyOrigin") }
-        
-    webauthnManager = WebAuthnManager(config: WebAuthnManager.Config(
-      relyingPartyID: relyingPartyID,
-      relyingPartyName: relyingPartyName,
-      relyingPartyOrigin: relyingPartyOrigin)
-    )
+    authController.delegate = self
+    authController.performRequests()
   }
   
-  @objc(beginAuthentication:)
-  func beginAuthentication(arguments: [Any]) {
-    guard let webauthnManager else { fatalError("Missing webauthnManager property" )}
-    
+  @available(iOS 15.0, *)
+  @objc(register:)
+  func register(arguments: [Any]) {
     guard let params = arguments.first as? [String: Any] else { fatalError("Missing parameters") }
-    guard let callback = params["callback"] as? KrollCallback else { fatalError("Missing parameter callback") }
+    
+    guard let challengeString = params["challenge"] as? String else { fatalError("Missing parametwer \"challenge\"")}
+    guard let userIDString = params["userId"] as? String else { fatalError("Missing parametwer \"userIDString\"")}
+    guard let userName = params["userName"] as? String else { fatalError("Missing parametwer \"userName\"")}
+    guard let relyingParty = params["relyingParty"] as? String else { fatalError("Missing parametwer \"relyingParty\"")}
 
-    guard let result = try? webauthnManager.beginAuthentication() else {
-      callback.call([["success": false, "error": "Challenge is not available" ]], thisObject: self)
-      return
+    let challenge = challengeString.data(using: .utf8)!
+    let userID = userIDString.data(using: .utf8)!
+    let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: relyingParty)
+    let platformKeyRequest = platformProvider.createCredentialRegistrationRequest(challenge: challenge, name: userName, userID: userID)
+    let authController = ASAuthorizationController(authorizationRequests: [platformKeyRequest])
+    
+    authController.delegate = self
+    authController.performRequests()
+  }
+}
+
+// MARK: ASAuthorizationControllerDelegate
+
+extension TiWebauthnModule: ASAuthorizationControllerDelegate {
+  func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    if #available(iOS 15.0, *) {
+      if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration {
+        fireEvent("registration", with: ["credential": String(data: credential.credentialID, encoding: .utf8)])
+      } else if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion {
+        fireEvent("verification", with: ["credential": String(data: credential.credentialID, encoding: .utf8)])
+      } else {
+        fireEvent("error", with: ["error": "Unhandled authentication case"])
+      }
     }
-        
-    callback.call([[ "challenge": result.challenge.base64URLEncodedString().asString() ]], thisObject: self)
   }
   
-  @objc(finishAuthentication:)
-  func finishAuthentication(arguments: [Any]) {
-    guard let webauthnManager else { fatalError("Missing webauthnManager property" )}
-    
-    guard let params = arguments.first as? [String: Any] else { fatalError("Missing parameters") }
-
-    guard let credential = params["credential"] as? String else { fatalError("Missing parameter credential") }
-    guard let expectedChallenge = params["expectedChallenge"] as? String else { fatalError("Missing parameter expectedChallenge") }
-    guard let credentialPublicKey = params["credentialPublicKey"] as? String else { fatalError("Missing parameter credentialPublicKey") }
-    guard let credentialCurrentSignCount = params["credentialCurrentSignCount"] as? String else { fatalError("Missing parameter credentialCurrentSignCount") }
-    guard let callback = params["callback"] as? KrollCallback else { fatalError("Missing parameter callback") }
-
-    let decoder = JSONDecoder()
-    
-    if let jsonData = credential.data(using: .utf8) {
-        do {
-          let authChallenge = try decoder.decode(AuthenticationCredential.self, from: jsonData)
-          guard let result = try? webauthnManager.finishAuthentication(credential: authChallenge, expectedChallenge: expectedChallenge.encode(), credentialPublicKey: credentialPublicKey.encode(), credentialCurrentSignCount: 0) else {
-            callback.call([["success": false, "error": "Credential is not available" ]], thisObject: self)
-            return
-          }
-          
-          callback.call([["success": true, "credentialID": result.credentialID.asString()]], thisObject: self)
-        } catch {
-          callback.call([["success": false, "error": error.localizedDescription]], thisObject: self)
-        }
-    }
+  func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: any Error) {
+    fireEvent("error", with: ["error": error.localizedDescription])
   }
 }
