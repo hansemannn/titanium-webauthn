@@ -34,7 +34,12 @@ class TiWebauthnModule: TiModule {
     let authController = ASAuthorizationController(authorizationRequests: [platformKeyRequest])
     
     authController.delegate = self
-    authController.performRequests()
+    
+    if #available(iOS 16.0, *) {
+      authController.performRequests(options: .preferImmediatelyAvailableCredentials)
+    } else {
+      authController.performRequests()
+    }
   }
   
   @available(iOS 15.0, *)
@@ -56,6 +61,14 @@ class TiWebauthnModule: TiModule {
     authController.delegate = self
     authController.performRequests()
   }
+  
+  private func base64ToBase64url(base64: String) -> String {
+    let base64url = base64
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
+    return base64url
+}
 }
 
 // MARK: ASAuthorizationControllerDelegate
@@ -68,7 +81,7 @@ extension TiWebauthnModule: ASAuthorizationControllerDelegate {
           "type": "registration",
           "rawClientDataJSON": credential.rawClientDataJSON.jsonRepresentation ?? "",
           "credential": credential.credentialID.base64EncodedString(),
-          "rawAttestationObject": credential.rawAttestationObject?.base64EncodedString() ?? "",
+          "rawAttestationObject": base64ToBase64url(base64: credential.rawAttestationObject?.base64EncodedString() ?? ""),
         ]
         
         if #available(iOS 17.0, *) {
