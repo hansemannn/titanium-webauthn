@@ -78,7 +78,7 @@ extension TiWebauthnModule: ASAuthorizationControllerDelegate {
     if #available(iOS 15.0, *) {
       if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration {
         var event: [String: Any] = [
-          "type": "registration",
+          "credentialType": "registration",
           "rawClientDataJSON": credential.rawClientDataJSON.jsonRepresentation ?? "",
           "credential": credential.credentialID.base64EncodedString(),
           "rawAttestationObject": base64ToBase64url(base64: credential.rawAttestationObject?.base64EncodedString() ?? ""),
@@ -91,7 +91,7 @@ extension TiWebauthnModule: ASAuthorizationControllerDelegate {
         fireEvent("verification", with: event)
       } else if let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion {
         var event: [String: Any] = [
-          "type": "assertion",
+          "credentialType": "assertion",
           "rawClientDataJSON": credential.rawClientDataJSON.jsonRepresentation ?? "",
           "credential": credential.credentialID.base64EncodedString(),
           "authenticatorData": credential.rawAuthenticatorData.base64EncodedString(),
