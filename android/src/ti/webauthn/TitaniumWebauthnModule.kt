@@ -9,70 +9,95 @@
 
 package ti.webauthn
 
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.core.app.ActivityCompat.startIntentSenderForResult
+import com.google.android.gms.fido.Fido
+import com.google.android.gms.fido.fido2.Fido2ApiClient
+import com.google.android.gms.fido.fido2.api.common.Attachment
+import com.google.android.gms.fido.fido2.api.common.AuthenticatorSelectionCriteria
+import com.google.android.gms.fido.fido2.api.common.EC2Algorithm
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialCreationOptions
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialDescriptor
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialParameters
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialRequestOptions
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialRpEntity
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialType
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialUserEntity
+import com.google.android.gms.fido.fido2.api.common.ResidentKeyRequirement
+import com.google.android.gms.fido.fido2.api.common.UserVerificationRequirement
+import com.google.android.gms.tasks.Task
 import org.appcelerator.kroll.KrollModule
 import org.appcelerator.kroll.KrollDict
 import org.appcelerator.kroll.annotations.Kroll
-import org.appcelerator.kroll.common.Log
-import org.appcelerator.kroll.common.TiConfig
 import org.appcelerator.titanium.TiApplication
+import java.util.Base64
 
 @Kroll.module(name = "TitaniumWebauthn", id = "ti.webauthn")
 class TitaniumWebauthnModule: KrollModule() {
 
-	// NOTE: You can develop Titanium Android modules in Android Studio. Follow these three steps:
-	//   1. Build the empty module
-	//   2. Drag the "build" folder into Android Studio
-	//   3. Start developing! All dependencies and code completions are supported!
+	private lateinit var fido2ApiClient: Fido2ApiClient
 
-	companion object {
-		// Standard Debugging variables
-		private const val LCAT = "TitaniumWebauthnModule"
-		private val DBG = TiConfig.LOGD
-		
-		// You can define constants with @Kroll.constant, for example:
-		// @Kroll.constant private val EXTERNAL_NAME = "EXTERNAL_NAME"
-
-		@Kroll.onAppCreate
-		fun onAppCreate(app: TiApplication?) {
-			Log.d(LCAT, "inside onAppCreate")
-			// put module init code that needs to run when the application is created
-		}
-	}
-
-	// Methods
-
+	@RequiresApi(Build.VERSION_CODES.O)
 	@Kroll.method
-	fun example(): String {
-		Log.d(LCAT, "example() called")
-		return "hello world"
+	fun register(params: KrollDict) {
+		fido2ApiClient = Fido.getFido2ApiClient(TiApplication.getInstance().currentActivity)
+
+		val publicKeyCredentialCreationOptions = PublicKeyCredentialCreationOptions.Builder()
+			.setRp(PublicKeyCredentialRpEntity(params.getString("relyingParty"), getAppName(), null))
+			.setUser(PublicKeyCredentialUserEntity(params.getString("userId").toByteArray(), params.getString("userId"), null, params.getString("userName")))
+			.setChallenge(Base64.getDecoder().decode(params.getString("challenge")))
+			.setParameters(listOf(PublicKeyCredentialParameters(PublicKeyCredentialType.PUBLIC_KEY.toString(), EC2Algorithm.ES256.algoValue)))
+			.setAuthenticatorSelection(AuthenticatorSelectionCriteria.Builder().setAttachment(Attachment.PLATFORM).setRequireResidentKey(false).build())
+			.setTimeoutSeconds(60.0)
+			.build()
+
+		val fido2PendingIntentTask: Task<PendingIntent> = fido2ApiClient.getRegisterPendingIntent(publicKeyCredentialCreationOptions)
+
+		// TODO: Handle result via intent helper
+		//
+		//		val fido2Response = Fido2Intent.getFido2Response(data)
+		//		if (fido2Response.errorCode == null) {
+		//			val credential = fido2Response.getAuthenticatorAttestationResponse()
+		//			// Send the credential to your server for validation and storage
+		//		} else {
+		//			// Handle error
+		//		}
+		fido2PendingIntentTask.addOnSuccessListener { pendingIntent ->
+			TiApplication.getInstance().currentActivity.startIntentSenderForResult(pendingIntent.intentSender, 1001, null, 0, 0, 0, null)
+		}
 	}
 	
+	@RequiresApi(Build.VERSION_CODES.O)
 	@Kroll.method
-	fun testMethod(params: KrollDict) {
-		Log.d(LCAT, "testMethod() called")
+	fun login(params: KrollDict) {
+		val publicKeyCredentialRequestOptions = PublicKeyCredentialRequestOptions.Builder()
+			.setChallenge(Base64.getDecoder().decode(params.getString("challenge")))
+			.setRpId(params.getString("relyingParty"))
+			.setAllowList(listOf(PublicKeyCredentialDescriptor(PublicKeyCredentialType.PUBLIC_KEY.toString(), Base64.getDecoder().decode(params.getString("credential")), null)))
+			.setTimeoutSeconds(60.0)
+			.build()
 
-		// Access the parameters passed as an Object, e.g. "myModule.testMethod({ name: 'John Doe', flag: true })"
-		val name = params.getString("name")
-		val flag = params.optBoolean("flag", false)
+		val fido2PendingIntentTask: Task<PendingIntent> = fido2ApiClient.getSignPendingIntent(publicKeyCredentialRequestOptions)
 
-		// Fire an event that can be added via "myModule.addEventListener('shown', ...)"
-		val event = KrollDict()
-		event["name"] = name
-		event["flag"] = flag
-
-		fireEvent("", event)
+		// TODO: Handle result via intent helper
+		//
+		//		val fido2Response = Fido2Intent.getFido2Response(data)
+		//		if (fido2Response.errorCode == null) {
+		//			val credential = fido2Response.getAuthenticatorAssertionResponse()
+		//			// Send the credential to your server for validation and verification
+		//		} else {
+		//			// Handle error
+		//		}
+		fido2PendingIntentTask.addOnSuccessListener { pendingIntent ->
+			TiApplication.getInstance().currentActivity.startIntentSenderForResult(pendingIntent.intentSender, 1001, null, 0, 0, 0, null)
+		}
 	}
 
-	// Properties
-
-	@get:Kroll.getProperty
-	@set:Kroll.setProperty
-	var exampleProp: String
-		get() {
-			Log.d(LCAT, "get example property")
-			return "hello world"
-		}
-		set(value) {
-			Log.d(LCAT, "set example property: $value")
-		}
+	private fun getAppName(): String {
+		val applicationInfo = TiApplication.getInstance().packageManager.getApplicationInfo(TiApplication.getInstance().packageName, 0)
+		return TiApplication.getInstance().packageManager.getApplicationLabel(applicationInfo).toString()
+	}
 }

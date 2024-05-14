@@ -11,36 +11,7 @@ Native support for the WebAuthn authentication strategy (also called "Passkeys")
 
 ## Example
 
-```js
-import WebAuthn from 'ti.webauthn';
-
-WebAuthn.addEventListener('error', ({ error }) => {
-  // Handle error
-});
-
-WebAuthn.addEventListener('verification', ({ credential }) => {
-  // Handle verification
-  console.log(credential);
-});
-
-WebAuthn.addEventListener('registration', ({ credential }) => {
-  // Handle registration
-  console.log(credential);
-});
-
-// Register a new device
-WebAuthn.register({
-  challenge: '<base-64-encoded-server-challenge>',
-  userId: '123',
-  userName: 'Hans',
-  relyingParty: 'example.com'
-});
-
-// Login an existing device
-WebAuthn.login({
-  challenge: '<base-64-encoded-server-challenge>',
-  relyingParty: 'example.com'
-});
+See `example/app.js` for details!
 
 ## Author
 

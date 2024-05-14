@@ -1,36 +1,32 @@
-// This is a test harness for your module
-// You should do something interesting in this harness
-// to test out the module and to provide instructions
-// to users on how to use it by example.
+import WebAuthn from 'ti.webauthn';
 
+WebAuthn.addEventListener('error', ({ error }) => {
+  // Handle error
+  console.error(error);
+});
 
-// open a single window
-const win = Ti.UI.createWindow();
-const label = Ti.UI.createLabel();
-win.add(label);
-win.open();
+WebAuthn.addEventListener('verification', event => {
+  // Handle verification (different properties are set based on the credential type)
+  console.log(event.credentialType);
+});
 
-// TODO: write your module tests here
-import titanium_webauthn  from 'ti.webauthn';
-Ti.API.info("module is => " + titanium_webauthn);
+const window = Ti.UI.createWindow();
 
-label.text = titanium_webauthn.example();
-
-Ti.API.info("module exampleProp is => " + titanium_webauthn.exampleProp);
-titanium_webauthn.exampleProp = "This is a test value";
-
-if (Ti.Platform.name == "android") {
-	const proxy = titanium_webauthn.createExample({
-		message: "Creating an example Proxy",
-		backgroundColor: "red",
-		width: 100,
-		height: 100,
-		top: 100,
-		left: 150
+window.addEventListener('open', () => {
+	// Register a new device
+	WebAuthn.register({
+		challenge: '<base-64-encoded-challenge-from-server>',
+		userId: '<user-id-from-server',
+		userName: '<user-name-from-server>',
+		relyingParty: '<relying-party-from-server>'
 	});
 
-	proxy.printMessage("Hello world!");
-	proxy.message = "Hi world!.  It's me again.";
-	proxy.printMessage("Hello world!");
-	win.add(proxy);
-}
+	// OR: Login an existing device
+	//
+	// WebAuthn.login({
+	// 	 challenge: '<base-64-encoded-server-challenge>',
+	//   relyingParty: '<relying-party-from-server>'
+	// });
+});
+
+window.open();
